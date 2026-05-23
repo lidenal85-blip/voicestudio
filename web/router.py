@@ -60,7 +60,9 @@ async def _get_active_transcription(db: AsyncSession, project_id: str):
 
 def _r(request, name, context):
     """Совместимый вызов TemplateResponse для любой версии Starlette."""
-    ctx = {"request": request, **context}
+    import os
+    base = os.environ.get("ROOT_PATH", "").rstrip("/")
+    ctx = {"request": request, "base": base, **context}
     return templates.TemplateResponse(name, ctx)
 
 

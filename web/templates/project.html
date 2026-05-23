@@ -333,7 +333,7 @@
 {% endblock %}
 
 {% block content %}
-<a href="/" class="back-link">← Все проекты</a>
+<a href="{{ base }}/" class="back-link">← Все проекты</a>
 
 <div class="page-header">
   <h1>{{ project.title }}</h1>
@@ -346,18 +346,18 @@
 <!-- Quick action buttons -->
 {% if project.status == 'ready' %}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-  <a href="/projects/{{ project.id }}/player">
+  <a href="{{ base }}/projects/{{ project.id }}/player">
     <button class="btn btn-primary">▶ Karaoke</button>
   </a>
   {% if has_transcription %}
-  <a href="/projects/{{ project.id }}/editor">
+  <a href="{{ base }}/projects/{{ project.id }}/editor">
     <button class="btn">✏️ LRC Editor</button>
   </a>
   {% endif %}
-  <a href="/projects/{{ project.id }}/record">
+  <a href="{{ base }}/projects/{{ project.id }}/record">
     <button class="btn">🎤 Запись</button>
   </a>
-  <a href="/projects/{{ project.id }}/history">
+  <a href="{{ base }}/projects/{{ project.id }}/history">
     <button class="btn">📦 История / Экспорт</button>
   </a>
 </div>

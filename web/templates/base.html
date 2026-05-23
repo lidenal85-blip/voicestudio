@@ -235,12 +235,12 @@
 </head>
 <body>
   <header class="topbar">
-    <a href="/" class="topbar-logo">
+    <a href="{{ base }}/" class="topbar-logo">
       VOICE STUDIO <span>// MVP</span>
     </a>
     <nav class="topbar-nav">
-      <a href="/"><button class="nav-btn">Проекты</button></a>
-      <a href="/upload"><button class="nav-btn primary">+ Загрузить</button></a>
+      <a href="{{ base }}/"><button class="nav-btn">Проекты</button></a>
+      <a href="{{ base }}/upload"><button class="nav-btn primary">+ Загрузить</button></a>
     </nav>
   </header>
 
@@ -267,5 +267,6 @@
     }
   </script>
   {% block scripts %}{% endblock %}
+<script>window._base = '{{ base }}';</script>
 </body>
 </html>

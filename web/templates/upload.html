@@ -155,7 +155,7 @@
 {% endblock %}
 
 {% block content %}
-<a href="/" class="back-link">← Все проекты</a>
+<a href="{{ base }}/" class="back-link">← Все проекты</a>
 
 <div class="page-header">
   <h1>Загрузить трек</h1>
@@ -200,7 +200,7 @@
 
   <!-- Submit -->
   <div class="submit-area">
-    <a href="/"><button class="btn" type="button">Отмена</button></a>
+    <a href="{{ base }}/"><button class="btn" type="button">Отмена</button></a>
     <button class="btn btn-primary" id="submit-btn" disabled>
       Загрузить →
     </button>
@@ -296,7 +296,7 @@
 
     try {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/upload');
+      xhr.open('POST', (window._base||'') + '/api/upload');
 
       xhr.upload.addEventListener('progress', e => {
         if (e.lengthComputable) {
