@@ -78,11 +78,15 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
 
+    import os
+    root_path = os.environ.get("ROOT_PATH", "")
+
     app = FastAPI(
         title="Voice Studio MVP",
         description="AI-сервис разделения аудио на вокал и инструментал",
         version="1.1.0",
         lifespan=lifespan,
+        root_path=root_path,
     )
 
     app.add_middleware(
