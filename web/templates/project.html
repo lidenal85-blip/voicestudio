@@ -197,6 +197,134 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── PROGRESS STEPS ─────────────────────────────────────── */
+  .progress-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .progress-title {
+    font-size: 0.85rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .progress-eta {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+  }
+  .step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 30px;
+    width: 2px;
+    height: calc(100% - 8px);
+    background: var(--border);
+  }
+  .step.done:not(:last-child)::after { background: var(--mint); }
+  .step.active:not(:last-child)::after { background: var(--border); }
+
+  .step-icon {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    border: 2px solid var(--border);
+    background: var(--bg);
+    position: relative;
+    z-index: 1;
+  }
+  .step.done .step-icon {
+    border-color: var(--mint);
+    background: var(--mint-dim);
+    color: var(--mint);
+  }
+  .step.active .step-icon {
+    border-color: var(--amber);
+    background: rgba(255,204,0,0.1);
+  }
+  .step.waiting .step-icon {
+    border-color: var(--border);
+    color: var(--muted);
+  }
+  .step-spin {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,204,0,0.3);
+    border-top-color: var(--amber);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .step-body {
+    padding: 4px 0 18px;
+  }
+  .step-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+  .step.waiting .step-name { color: var(--muted); }
+  .step-desc {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .step.active .step-desc { color: var(--amber); }
+  .step.done .step-desc { color: var(--mint); opacity: 0.7; }
+
+  /* Пульс для активного шага */
+  .step.active .step-icon::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--amber);
+    opacity: 0.4;
+    animation: pulse-ring 1.5s ease-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%   { transform: scale(1); opacity: 0.4; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+
+  /* Прогресс бар */
+  .progress-bar-wrap {
+    margin-top: 16px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--mint), var(--amber));
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
   @media (max-width: 520px) {
     .info-grid { grid-template-columns: 1fr 1fr; }
     .asset-row { flex-wrap: wrap; }
@@ -235,30 +363,110 @@
 </div>
 {% endif %}
 
-<!-- Status banner for non-ready projects -->
+<!-- Progress steps for non-ready projects -->
 {% if project.status != 'ready' %}
+{% set state = project.pipeline_state %}
+{% set pstatus = project.status %}
+
+{% if pstatus == 'failed' %}
 <div class="status-banner">
-  {% if project.status == 'processing' %}
-  <div class="spinner"></div>
-  <div>
-    <div style="font-size:0.85rem;color:#fff">Обработка...</div>
-    <div class="text-muted">Pipeline: {{ project.pipeline_state }}</div>
-  </div>
-  {% elif project.status == 'created' %}
-  <div style="font-size:1.2rem">⏳</div>
-  <div>
-    <div style="font-size:0.85rem;color:#fff">Ожидает воркера</div>
-    <div class="text-muted">Задача поставлена в очередь</div>
-  </div>
-  {% elif project.status == 'failed' %}
   <div style="font-size:1.2rem">⚠️</div>
   <div>
     <div style="font-size:0.85rem;color:var(--red)">Ошибка обработки</div>
     <div class="text-muted">Попробуйте загрузить трек заново</div>
   </div>
-  {% endif %}
-  <span class="badge badge-{{ project.status }}" style="margin-left:auto">{{ project.status }}</span>
+  <span class="badge badge-failed" style="margin-left:auto">failed</span>
 </div>
+{% else %}
+
+{# Определяем прогресс #}
+{% if pstatus == 'created' %}
+  {% set step_idx = 0 %}
+{% elif state == 'separating' %}
+  {% set step_idx = 1 %}
+{% elif state == 'transcribing' %}
+  {% set step_idx = 2 %}
+{% else %}
+  {% set step_idx = 1 %}
+{% endif %}
+
+{% set pct = [0, 15, 60, 90][step_idx] %}
+
+<div class="progress-card" id="progress-card">
+  <div class="progress-header">
+    <div class="progress-title">
+      <div class="spinner" style="width:14px;height:14px;border-top-color:var(--amber)"></div>
+      Обрабатываем трек...
+    </div>
+    <div class="progress-eta" id="eta-label">
+      {% if step_idx == 0 %}Ожидание воркера
+      {% elif step_idx == 1 %}~2-3 мин
+      {% elif step_idx == 2 %}~30 сек
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- Шаг 1: Загрузка -->
+    <div class="step done">
+      <div class="step-icon">✓</div>
+      <div class="step-body">
+        <div class="step-name">Файл загружен</div>
+        <div class="step-desc">Аудио принято и поставлено в очередь</div>
+      </div>
+    </div>
+
+    <!-- Шаг 2: Разделение -->
+    <div class="step {% if step_idx == 1 %}active{% elif step_idx > 1 %}done{% else %}waiting{% endif %}">
+      <div class="step-icon">
+        {% if step_idx == 1 %}<div class="step-spin"></div>
+        {% elif step_idx > 1 %}✓
+        {% else %}2{% endif %}
+      </div>
+      <div class="step-body">
+        <div class="step-name">Разделение вокала</div>
+        <div class="step-desc">
+          {% if step_idx == 1 %}Demucs работает на GPU — отделяем голос от музыки...
+          {% elif step_idx > 1 %}Вокал и инструментал готовы
+          {% else %}Demucs htdemucs (T4 GPU){% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Шаг 3: Транскрибация -->
+    <div class="step {% if step_idx == 2 %}active{% elif step_idx > 2 %}done{% else %}waiting{% endif %}">
+      <div class="step-icon">
+        {% if step_idx == 2 %}<div class="step-spin"></div>
+        {% elif step_idx > 2 %}✓
+        {% else %}3{% endif %}
+      </div>
+      <div class="step-body">
+        <div class="step-name">Транскрибация текста</div>
+        <div class="step-desc">
+          {% if step_idx == 2 %}Whisper распознаёт слова песни...
+          {% elif step_idx > 2 %}Текст песни готов
+          {% else %}Whisper AI — распознавание речи{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Шаг 4: Готово -->
+    <div class="step waiting">
+      <div class="step-icon">🎤</div>
+      <div class="step-body">
+        <div class="step-name">Готово к пению</div>
+        <div class="step-desc">Плеер + синхронизированный текст</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="pbar" style="width:{{ pct }}%"></div>
+  </div>
+</div>
+{% endif %}
 {% endif %}
 
 <!-- Player (always shown; non-ready tracks have only original) -->
@@ -420,7 +628,73 @@
 
   /* ── AUTO-REFRESH for non-ready ─────────────────────────── */
   {% if project.status in ('created', 'processing') %}
-  setTimeout(() => location.reload(), 8000);
+  (function() {
+    // Умный поллинг — обновляем только статус без перезагрузки страницы
+    const POLL_INTERVAL = 5000;
+    const projId = '{{ project.id }}';
+    let dots = 0;
+
+    // Анимируем прогресс бар пока ждём
+    const pbar = document.getElementById('pbar');
+    const etaLabel = document.getElementById('eta-label');
+    let currentPct = {{ pct }};
+
+    function animateBar() {
+      if (!pbar) return;
+      // Медленно ползём к следующей отметке
+      const targets = [15, 55, 85, 99];
+      const stepIdx = {{ step_idx }};
+      const target = targets[Math.min(stepIdx, targets.length-1)];
+      if (currentPct < target) {
+        currentPct = Math.min(currentPct + 0.3, target);
+        pbar.style.width = currentPct + '%';
+      }
+    }
+
+    // Тикаем каждые 3 сек
+    const barTimer = setInterval(animateBar, 3000);
+
+    async function checkStatus() {
+      try {
+        const r = await fetch(`/api/projects/${projId}/status`);
+        if (!r.ok) { setTimeout(() => location.reload(), POLL_INTERVAL); return; }
+        const data = await r.json();
+
+        if (data.status === 'ready') {
+          // Готово! Заполняем бар и перезагружаем
+          if (pbar) pbar.style.width = '100%';
+          clearInterval(barTimer);
+          setTimeout(() => location.reload(), 800);
+          return;
+        }
+
+        if (data.status === 'failed') {
+          location.reload();
+          return;
+        }
+
+        // Обновляем ETA label
+        if (etaLabel) {
+          if (data.pipeline_state === 'separating') etaLabel.textContent = '~2-3 мин';
+          else if (data.pipeline_state === 'transcribing') etaLabel.textContent = '~30 сек';
+          else etaLabel.textContent = 'Ожидание...';
+        }
+
+        // Если pipeline_state изменился — перезагружаем страницу
+        if (data.pipeline_state !== '{{ project.pipeline_state }}') {
+          location.reload();
+          return;
+        }
+
+        setTimeout(checkStatus, POLL_INTERVAL);
+      } catch(e) {
+        // Сеть упала — просто перезагружаем
+        setTimeout(() => location.reload(), POLL_INTERVAL * 2);
+      }
+    }
+
+    setTimeout(checkStatus, POLL_INTERVAL);
+  })();
   {% endif %}
 </script>
 {% endblock %}

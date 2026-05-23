@@ -225,6 +225,20 @@ async def complete_job(
     return {"status": "ok", "next_job": "transcription"}
 
 
+# ── GET /projects/{id}/status ─────────────────────────────
+@router.get("/projects/{project_id}/status")
+async def get_project_status(project_id: str, db: AsyncSession = Depends(get_db)):
+    """Лёгкий endpoint для live поллинга статуса проекта."""
+    res = await db.execute(select(Project).where(Project.id == project_id))
+    project: Project | None = res.scalar_one_or_none()
+    if project is None:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    return {
+        "status": project.status,
+        "pipeline_state": project.pipeline_state,
+    }
+
+
 # ── GET /projects/{id}/assets/{type} ──────────────────────────
 @router.get("/projects/{project_id}/assets/{asset_type}")
 async def get_asset(project_id: str, asset_type: str, db: AsyncSession = Depends(get_db)):
