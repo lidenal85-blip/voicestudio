@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}История — {{ project.title }}{% endblock %}
+
+{% block head %}
+<style>
+  .version-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 14px;
+    align-items: center;
+  }
+  .version-card:hover { border-color: var(--border-h); }
+  .version-card.active { border-color: var(--mint); background: var(--mint-dim); }
+
+  .version-badge {
+    font-family: var(--sans); font-weight: 800; font-size: 1.3rem;
+    color: var(--mint); min-width: 36px; text-align: center;
+  }
+  .version-card.active .version-badge { color: #fff; }
+
+  .version-info { min-width: 0; }
+  .version-meta { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+
+  .version-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .export-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .export-btn {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 14px 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); text-decoration: none;
+    color: var(--text); font-size: 0.8rem;
+    transition: all 0.2s; cursor: pointer; gap: 6px;
+  }
+  .export-btn:hover { border-color: var(--mint); color: var(--mint); background: var(--mint-dim); text-decoration: none; }
+  .export-btn .export-icon { font-size: 1.5rem; }
+  .export-btn .export-ext { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); }
+
+  .reprocess-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .model-select {
+    font-family: var(--mono); font-size: 0.75rem;
+    padding: 6px 10px; border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg); color: var(--text);
+    cursor: pointer;
+  }
+  .model-select:focus { border-color: var(--mint); outline: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+  <a href="/projects/{{ project.id }}" class="back-link">← Детали проекта</a>
+  <div style="display:flex;gap:8px">
+    {% if has_transcription %}
+    <a href="/projects/{{ project.id }}/editor"><button class="btn">✏️ Редактор</button></a>
+    {% endif %}
+    <a href="/projects/{{ project.id }}/player"><button class="btn">▶ Плеер</button></a>
+  </div>
+</div>
+
+<div class="page-header">
+  <h1>История и экспорт</h1>
+  <p class="text-muted">{{ project.title }}</p>
+</div>
+
+<!-- Export section -->
+{% if has_transcription %}
+<div class="section-title">Экспорт</div>
+<div class="export-grid">
+  <a class="export-btn" href="/api/projects/{{ project.id }}/export/lrc" download>
+    <span class="export-icon">🎵</span>
+    <span>LRC</span>
+    <span class="export-ext">lyrics</span>
+  </a>
+  <a class="export-btn" href="/api/projects/{{ project.id }}/export/srt" download>
+    <span class="export-icon">📝</span>
+    <span>SRT</span>
+    <span class="export-ext">субтитры</span>
+  </a>
+  <a class="export-btn" href="/api/projects/{{ project.id }}/export/vtt" download>
+    <span class="export-icon">🌐</span>
+    <span>WebVTT</span>
+    <span class="export-ext">субтитры</span>
+  </a>
+  {% if has_vocal %}
+  <a class="export-btn" href="/api/projects/{{ project.id }}/export/midi" download id="midi-btn">
+    <span class="export-icon">🎹</span>
+    <span>MIDI</span>
+    <span class="export-ext">мелодия</span>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Transcription history -->
+<div class="section-title" style="margin-top:24px">Версии транскрипции</div>
+
+{% if transcriptions %}
+<div id="versions-list">
+  {% for tr in transcriptions %}
+  <div class="version-card {% if tr.is_active %}active{% endif %}" id="v-{{ tr.id }}">
+    <div class="version-badge">v{{ tr.version }}</div>
+    <div class="version-info">
+      <div style="font-size:0.88rem;color:#fff">
+        {{ tr.lines_count }} строк
+        {% if tr.language %} · {{ tr.language }}{% endif %}
+        {% if tr.confidence %} · {{ (tr.confidence * 100) | round(0) | int }}%{% endif %}
+        {% if tr.is_active %}<span class="badge badge-ready" style="margin-left:6px">active</span>{% endif %}
+      </div>
+      <div class="version-meta">{{ tr.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+    </div>
+    <div class="version-actions">
+      {% if not tr.is_active %}
+      <button class="btn btn-primary" style="font-size:0.72rem;padding:5px 12px"
+              onclick="restoreVersion('{{ tr.id }}', {{ tr.version }})">
+        Восстановить
+      </button>
+      {% else %}
+      <span class="badge badge-ready">Текущая</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:32px;color:var(--muted)">
+  Транскрипций пока нет
+</div>
+{% endif %}
+
+<!-- Reprocess -->
+<div class="section-title" style="margin-top:24px">Повторная обработка</div>
+<div class="reprocess-card">
+  <p class="text-muted" style="font-size:0.82rem;margin-bottom:16px">
+    Обработать трек заново с другими моделями. Текущие данные сохранятся как предыдущая версия.
+  </p>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Demucs</div>
+      <select class="model-select" id="sel-demucs">
+        <option value="htdemucs">htdemucs (быстро)</option>
+        <option value="htdemucs_ft">htdemucs_ft (лучше)</option>
+        <option value="mdx_extra">mdx_extra (лучшее)</option>
+        <option value="htdemucs_6s">htdemucs 6-stem</option>
+      </select>
+    </div>
+    <div>
+      <div style="font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Whisper</div>
+      <select class="model-select" id="sel-whisper">
+        <option value="tiny">tiny (быстро)</option>
+        <option value="base" selected>base (баланс)</option>
+        <option value="small">small (хорошо)</option>
+        <option value="medium">medium (отлично)</option>
+        <option value="large">large (лучшее)</option>
+      </select>
+    </div>
+    <div style="align-self:flex-end">
+      <button class="btn btn-primary" id="btn-reprocess">🔄 Запустить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pipeline events log -->
+<details style="margin-top:20px">
+  <summary style="font-size:0.72rem;color:var(--muted);cursor:pointer;text-transform:uppercase;letter-spacing:0.08em">
+    Pipeline Events (audit log)
+  </summary>
+  <div id="events-list" style="margin-top:10px;font-size:0.75rem;font-family:var(--mono)"></div>
+</details>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PROJECT_ID = '{{ project.id }}';
+
+// ── Restore version ─────────────────────────────────────────
+async function restoreVersion(trId, version) {
+  if (!confirm(`Восстановить версию v${version}?`)) return;
+  const r = await fetch(
+    `/api/projects/${PROJECT_ID}/transcriptions/${trId}/restore`,
+    { method: 'POST' }
+  );
+  if (r.ok) {
+    showToast?.(`Версия v${version} восстановлена`);
+    setTimeout(() => location.reload(), 800);
+  } else {
+    showToast?.('Ошибка восстановления', false);
+  }
+}
+
+// ── Reprocess ───────────────────────────────────────────────
+document.getElementById('btn-reprocess').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-reprocess');
+  const demucs  = document.getElementById('sel-demucs').value;
+  const whisper = document.getElementById('sel-whisper').value;
+  if (!confirm(`Обработать заново?\nDemucs: ${demucs}\nWhisper: ${whisper}`)) return;
+
+  btn.disabled = true; btn.textContent = '⏳ Запускаю...';
+  const r = await fetch(`/api/projects/${PROJECT_ID}/reprocess`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ demucs_model: demucs, whisper_model: whisper }),
+  });
+  if (r.ok) {
+    const d = await r.json();
+    showToast?.(`Запущено. Job: ${d.new_job_id?.slice(0,8)}...`);
+    setTimeout(() => window.location.href = `/projects/${PROJECT_ID}`, 1200);
+  } else {
+    const d = await r.json().catch(() => ({}));
+    showToast?.(d.detail || 'Ошибка', false);
+    btn.disabled = false; btn.textContent = '🔄 Запустить';
+  }
+});
+
+// ── MIDI loading indicator ──────────────────────────────────
+document.getElementById('midi-btn')?.addEventListener('click', function() {
+  this.querySelector('.export-icon').textContent = '⏳';
+  setTimeout(() => { this.querySelector('.export-icon').textContent = '🎹'; }, 8000);
+});
+
+// ── Load pipeline events ────────────────────────────────────
+document.querySelector('details').addEventListener('toggle', async function() {
+  if (!this.open) return;
+  const list = document.getElementById('events-list');
+  if (list.dataset.loaded) return;
+  list.dataset.loaded = '1';
+  try {
+    const events = await fetch(`/api/projects/${PROJECT_ID}/events`).then(r => r.json());
+    list.innerHTML = events.length === 0
+      ? '<p style="color:var(--muted)">Нет событий</p>'
+      : events.map(e => `
+          <div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--muted);white-space:nowrap">${new Date(e.created_at).toLocaleTimeString('ru')}</span>
+            <span style="color:var(--mint)">${e.event_type}</span>
+            ${e.data ? `<span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis">${JSON.stringify(e.data)}</span>` : ''}
+          </div>`).join('');
+  } catch { list.innerHTML = '<p style="color:var(--red)">Ошибка загрузки</p>'; }
+});
+</script>
+{% endblock %}

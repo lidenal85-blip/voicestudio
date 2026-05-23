@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Проекты — Voice Studio{% endblock %}
+
+{% block head %}
+<style>
+  /* ── PROJECT TABLE ──────────────────────────────────────── */
+  .projects-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .project-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    color: inherit;
+  }
+  .project-row:hover {
+    border-color: var(--border-h);
+    box-shadow: var(--glow);
+    text-decoration: none;
+  }
+
+  .project-title {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .project-meta {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .project-date {
+    font-size: 0.72rem;
+    color: var(--muted);
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .project-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* ── EMPTY STATE ────────────────────────────────────────── */
+  .empty-state {
+    text-align: center;
+    padding: 64px 20px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+  }
+  .empty-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.3;
+    display: block;
+  }
+  .empty-state h2 {
+    font-family: var(--sans);
+    font-weight: 700;
+    color: var(--muted);
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+  .empty-state p {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  /* ── STATS BAR ──────────────────────────────────────────── */
+  .stats-bar {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-value {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 1.4rem;
+    color: var(--mint);
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .divider {
+    width: 1px;
+    height: 36px;
+    background: var(--border);
+    align-self: center;
+  }
+
+  @media (max-width: 520px) {
+    .project-row {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+    }
+    .project-date { grid-column: 1; grid-row: 2; }
+    .project-actions { grid-column: 2; grid-row: 1 / 3; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header flex justify-between items-center">
+  <div>
+    <h1>Проекты</h1>
+    <p class="text-muted">Все загруженные треки и их статус обработки</p>
+  </div>
+  <div class="waveform-deco" aria-hidden="true">
+    {% for h in [4,9,14,7,12,5,16,10,6,13,8,3,11,15,7,9] %}
+    <span style="height: {{ h }}px; --d: {{ (loop.index * 0.13 + 0.7) | round(2) }}s"></span>
+    {% endfor %}
+  </div>
+</div>
+
+{% if projects %}
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <span class="stat-value">{{ projects | length }}</span>
+    <span class="stat-label">Всего</span>
+  </div>
+  <div class="divider"></div>
+  <div class="stat-item">
+    <span class="stat-value" style="color:#fff">{{ projects | selectattr('status', 'eq', 'ready') | list | length }}</span>
+    <span class="stat-label">Готово</span>
+  </div>
+  <div class="divider"></div>
+  <div class="stat-item">
+    <span class="stat-value" style="color:var(--amber)">{{ projects | selectattr('status', 'in', ['processing','created']) | list | length }}</span>
+    <span class="stat-label">В работе</span>
+  </div>
+  {% set failed_count = projects | selectattr('status', 'eq', 'failed') | list | length %}
+  {% if failed_count > 0 %}
+  <div class="divider"></div>
+  <div class="stat-item">
+    <span class="stat-value" style="color:var(--red)">{{ failed_count }}</span>
+    <span class="stat-label">Ошибки</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- List -->
+<div class="projects-grid">
+  {% for p in projects %}
+  <div class="project-row">
+    <div>
+      <div class="project-title">{{ p.title }}</div>
+      <div class="project-meta">
+        <span class="badge badge-{{ p.status }}">{{ p.status }}</span>
+        &nbsp;·&nbsp; {{ p.pipeline_state }}
+      </div>
+    </div>
+    <div class="project-date">
+      {{ p.created_at.strftime('%d.%m.%Y') }}<br/>
+      <span style="opacity:0.5">{{ p.created_at.strftime('%H:%M') }}</span>
+    </div>
+    <div class="project-actions">
+      {% if p.status == 'ready' %}
+      <a href="/projects/{{ p.id }}">
+        <button class="btn btn-primary">Открыть →</button>
+      </a>
+      {% else %}
+      <a href="/projects/{{ p.id }}">
+        <button class="btn">Детали</button>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- Empty state -->
+<div class="empty-state">
+  <span class="empty-icon">🎙</span>
+  <h2>Нет проектов</h2>
+  <p>Загрузи трек — система разложит его на вокал и инструментал</p>
+  <a href="/upload">
+    <button class="btn btn-primary">Загрузить первый трек</button>
+  </a>
+</div>
+{% endif %}
+{% endblock %}

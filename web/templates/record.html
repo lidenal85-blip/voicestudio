@@ -1,0 +1,523 @@
+{% extends "base.html" %}
+
+{% block title %}Студия записи — {{ project.title }}{% endblock %}
+
+{% block head %}
+<style>
+  /* ── STEPS ───────────────────────────────────────────────── */
+  .steps {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .step {
+    flex: 1; padding: 12px 10px; text-align: center;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); cursor: default;
+    border-right: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .step:last-child { border-right: none; }
+  .step.active  { color: var(--mint); background: var(--mint-dim); }
+  .step.done    { color: rgba(122,253,214,0.5); }
+  .step-num     { display: block; font-size: 1rem; margin-bottom: 2px; }
+
+  /* ── PANEL ───────────────────────────────────────────────── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    display: none;
+  }
+  .panel.active { display: block; }
+
+  /* ── LATENCY PANEL ───────────────────────────────────────── */
+  .latency-result {
+    display: flex; align-items: center; gap: 20px;
+    padding: 16px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    margin: 16px 0; flex-wrap: wrap;
+  }
+  .latency-value {
+    font-family: var(--sans); font-weight: 800;
+    font-size: 2.2rem; color: var(--mint); line-height: 1;
+  }
+  .latency-unit { font-size: 0.75rem; color: var(--muted); }
+  .latency-samples { font-size: 0.72rem; color: var(--muted); }
+
+  .manual-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .manual-row label { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+  #sl-manual-offset {
+    -webkit-appearance: none; width: 180px; height: 4px;
+    background: var(--border); border-radius: 2px; outline: none;
+  }
+  #sl-manual-offset::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--mint); cursor: pointer;
+  }
+  #manual-offset-val { font-size: 0.82rem; color: var(--mint); min-width: 50px; }
+
+  /* ── RECORD PANEL ────────────────────────────────────────── */
+  .record-layout { display: grid; grid-template-columns: 1fr 220px; gap: 16px; }
+  @media (max-width: 600px) { .record-layout { grid-template-columns: 1fr; } }
+
+  .rec-main {}
+  .rec-sidebar {}
+
+  /* Level meter */
+  .level-meter-wrap {
+    height: 8px; background: rgba(255,255,255,0.06);
+    border-radius: 4px; overflow: hidden; margin-top: 12px;
+  }
+  .level-meter-bar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #7afdd6, #ffcc00 80%, #ff5f7e);
+    border-radius: 4px;
+    transition: width 0.05s linear;
+  }
+  .level-label { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+
+  /* Record button */
+  .rec-btn-wrap { text-align: center; padding: 20px 0; }
+  .btn-record {
+    width: 80px; height: 80px; border-radius: 50%;
+    border: 3px solid var(--red);
+    background: transparent; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; transition: all 0.2s;
+  }
+  .btn-record:hover { background: rgba(255,95,126,0.12); }
+  .btn-record.recording {
+    border-color: var(--red); background: rgba(255,95,126,0.2);
+    animation: rec-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes rec-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,95,126,0.4); }
+    50%       { box-shadow: 0 0 0 14px rgba(255,95,126,0); }
+  }
+
+  .rec-timer {
+    font-family: var(--sans); font-weight: 800; font-size: 1.4rem;
+    color: #fff; text-align: center; margin-top: 10px; letter-spacing: 0.05em;
+  }
+  .rec-status { font-size: 0.78rem; color: var(--muted); text-align: center; margin-top: 4px; }
+
+  /* Инструментал мини-плеер */
+  .inst-player { margin-bottom: 16px; }
+  .inst-player label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase;
+                       letter-spacing: 0.08em; display: block; margin-bottom: 6px; }
+  .inst-player audio { width: 100%; height: 34px;
+                       filter: invert(1) hue-rotate(150deg) brightness(0.85); }
+
+  /* ── PREVIEW PANEL ───────────────────────────────────────── */
+  .preview-tracks { display: flex; flex-direction: column; gap: 10px; }
+  .preview-track {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .preview-track label { font-size: 0.72rem; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .preview-track audio { flex: 1; height: 32px;
+                         filter: invert(1) hue-rotate(150deg) brightness(0.85); }
+
+  /* ── RECORDINGS LIST ─────────────────────────────────────── */
+  .rec-list { margin-top: 20px; }
+  .rec-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .rec-item-info { flex: 1; min-width: 120px; }
+  .rec-item-date { font-size: 0.7rem; color: var(--muted); }
+  .rec-item-dur  { font-size: 0.78rem; color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+  <a href="/projects/{{ project.id }}" class="back-link">← Детали проекта</a>
+  <a href="/projects/{{ project.id }}/player">
+    <button class="btn">▶ Плеер</button>
+  </a>
+</div>
+
+<div class="page-header">
+  <h1>Студия записи</h1>
+  <p class="text-muted">{{ project.title }}</p>
+</div>
+
+{% if not has_instrumental %}
+<div class="card" style="text-align:center;padding:32px">
+  <p style="color:var(--amber);margin-bottom:12px">⚠️ Инструментал ещё не готов</p>
+  <p class="text-muted">Дождись завершения обработки проекта</p>
+</div>
+{% else %}
+
+<!-- Steps -->
+<div class="steps">
+  <div class="step active" id="step-1">
+    <span class="step-num">1</span>Latency
+  </div>
+  <div class="step" id="step-2">
+    <span class="step-num">2</span>Запись
+  </div>
+  <div class="step" id="step-3">
+    <span class="step-num">3</span>Превью
+  </div>
+</div>
+
+<!-- Panel 1: Latency -->
+<div class="panel active" id="panel-1">
+  <h2 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin-bottom:8px">Измерение задержки</h2>
+  <p class="text-muted" style="font-size:0.82rem;margin-bottom:20px">
+    Включи звук и нажми кнопку. Система воспроизведёт короткий сигнал и поймает его эхо с микрофона.
+    Это займёт ~3 секунды.
+  </p>
+
+  <button class="btn btn-primary" id="btn-measure" style="margin-bottom:16px">
+    🎤 Измерить задержку
+  </button>
+  <button class="btn" id="btn-skip-latency">Пропустить (offset = 0)</button>
+
+  <div class="latency-result" id="latency-result" style="display:none">
+    <div>
+      <div class="latency-value" id="lat-value">—</div>
+      <div class="latency-unit">миллисекунд</div>
+    </div>
+    <div>
+      <div style="font-size:0.82rem;color:#fff">Round-trip: <span id="lat-rt">—</span> мс</div>
+      <div class="latency-samples" id="lat-samples"></div>
+      <div style="margin-top:4px">
+        <span style="font-size:0.72rem;color:var(--muted)">Точность: </span>
+        <span id="lat-conf" style="font-size:0.72rem;color:var(--mint)">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="manual-row">
+    <label>Ручная корректировка:</label>
+    <input type="range" id="sl-manual-offset" min="-200" max="500" value="0" step="5" />
+    <span id="manual-offset-val">0 мс</span>
+  </div>
+
+  <div style="margin-top:20px">
+    <button class="btn btn-primary" id="btn-to-record" disabled>
+      Перейти к записи →
+    </button>
+  </div>
+</div>
+
+<!-- Panel 2: Record -->
+<div class="panel" id="panel-2">
+  <div class="record-layout">
+    <div class="rec-main">
+      <h2 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin-bottom:16px">
+        Запись голоса
+        <span id="offset-badge" style="font-size:0.72rem;color:var(--muted);font-family:var(--mono)"></span>
+      </h2>
+
+      <div class="inst-player">
+        <label>Инструментал (для ориентира)</label>
+        <audio id="inst-audio" src="/api/projects/{{ project.id }}/assets/instrumental" preload="auto"></audio>
+      </div>
+
+      <div class="rec-btn-wrap">
+        <button class="btn-record" id="btn-rec">⏺</button>
+        <div class="rec-timer" id="rec-timer">0:00</div>
+        <div class="rec-status" id="rec-status">Нажми для записи</div>
+      </div>
+
+      <div class="level-meter-wrap">
+        <div class="level-meter-bar" id="level-bar"></div>
+      </div>
+      <div class="level-label" id="level-label">Уровень микрофона</div>
+    </div>
+
+    <div class="rec-sidebar">
+      <div class="card" style="padding:14px">
+        <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Подсказки</div>
+        <p style="font-size:0.78rem;line-height:1.7;color:var(--text)">
+          🎵 Слушай инструментал в наушниках<br>
+          🎤 Пой в микрофон<br>
+          ⏹ Нажми снова чтобы остановить<br>
+          ⚙️ Offset: <strong id="offset-hint">0 мс</strong>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel 3: Preview -->
+<div class="panel" id="panel-3">
+  <h2 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin-bottom:16px">Превью и загрузка</h2>
+
+  <div id="preview-uploading" style="text-align:center;padding:32px;display:none">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <p class="text-muted">Микширование...</p>
+  </div>
+
+  <div id="preview-ready" style="display:none">
+    <div class="preview-tracks">
+      <div class="preview-track">
+        <label>Голос (raw)</label>
+        <audio id="prev-mic" controls preload="none"></audio>
+      </div>
+      <div class="preview-track">
+        <label>Микс</label>
+        <audio id="prev-mixed" controls preload="none"></audio>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+      <a id="dl-mixed" href="#" download>
+        <button class="btn btn-primary">⬇ Скачать микс</button>
+      </a>
+      <button class="btn" id="btn-new-take">🔄 Новый дубль</button>
+    </div>
+  </div>
+
+  <!-- История записей -->
+  <div class="rec-list" id="rec-list"></div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if has_instrumental %}
+<script type="module">
+import { LatencyMeasurer } from '/static/js/latency-measurer.js';
+import { RecorderEngine  } from '/static/js/recorder-engine.js';
+
+const PROJECT_ID = '{{ project.id }}';
+let timingOffsetMs = 0;
+let currentRecordingId = null;
+
+const measurer = new LatencyMeasurer();
+const recorder = new RecorderEngine();
+
+// ── Step navigation ────────────────────────────────────────
+function goStep(n) {
+  document.querySelectorAll('.step').forEach((s, i) => {
+    s.classList.toggle('active', i + 1 === n);
+    if (i + 1 < n) s.classList.add('done');
+  });
+  document.querySelectorAll('.panel').forEach((p, i) => {
+    p.classList.toggle('active', i + 1 === n);
+  });
+}
+
+// ── Step 1: Latency ────────────────────────────────────────
+const btnMeasure     = document.getElementById('btn-measure');
+const btnSkip        = document.getElementById('btn-skip-latency');
+const btnToRecord    = document.getElementById('btn-to-record');
+const latResult      = document.getElementById('latency-result');
+const slManual       = document.getElementById('sl-manual-offset');
+const manualVal      = document.getElementById('manual-offset-val');
+
+btnMeasure.addEventListener('click', async () => {
+  btnMeasure.disabled = true;
+  btnMeasure.textContent = '⏳ Измеряю...';
+  try {
+    const { latencyMs, roundTripMs, confidence, samples } = await measurer.measure(3);
+    timingOffsetMs = latencyMs;
+    slManual.value = latencyMs;
+    manualVal.textContent = latencyMs + ' мс';
+
+    document.getElementById('lat-value').textContent   = latencyMs;
+    document.getElementById('lat-rt').textContent      = roundTripMs;
+    document.getElementById('lat-conf').textContent    = (confidence * 100).toFixed(0) + '%';
+    document.getElementById('lat-samples').textContent = `Замеры: ${samples.map(s=>Math.round(s)).join(', ')} мс`;
+    latResult.style.display = 'flex';
+    btnToRecord.disabled = false;
+    measurer.release();
+  } catch (e) {
+    showToast?.('Ошибка измерения: ' + e.message, false);
+  } finally {
+    btnMeasure.disabled = false;
+    btnMeasure.textContent = '🎤 Измерить снова';
+  }
+});
+
+btnSkip.addEventListener('click', () => {
+  timingOffsetMs = 0;
+  slManual.value = 0;
+  manualVal.textContent = '0 мс';
+  btnToRecord.disabled = false;
+  measurer.release();
+});
+
+slManual.addEventListener('input', () => {
+  timingOffsetMs = +slManual.value;
+  manualVal.textContent = slManual.value + ' мс';
+});
+
+btnToRecord.addEventListener('click', async () => {
+  await recorder.requestMic();
+  recorder.onLevel = (dBFS) => {
+    const pct = Math.max(0, Math.min(100, ((dBFS + 60) / 60) * 100));
+    document.getElementById('level-bar').style.width = pct + '%';
+    document.getElementById('level-label').textContent =
+      `Уровень: ${dBFS} dBFS${dBFS > -3 ? ' ⚠️ клиппинг!' : ''}`;
+  };
+  document.getElementById('offset-badge').textContent = ` offset=${timingOffsetMs}мс`;
+  document.getElementById('offset-hint').textContent  = timingOffsetMs + ' мс';
+  goStep(2);
+});
+
+// ── Step 2: Record ─────────────────────────────────────────
+const btnRec    = document.getElementById('btn-rec');
+const recTimer  = document.getElementById('rec-timer');
+const recStatus = document.getElementById('rec-status');
+let   timerInterval = null;
+
+btnRec.addEventListener('click', async () => {
+  if (recorder.isRecording) {
+    // Стоп
+    btnRec.classList.remove('recording');
+    clearInterval(timerInterval);
+    recStatus.textContent = 'Обработка...';
+    btnRec.disabled = true;
+
+    const blob = await recorder.stop();
+    await uploadRecording(blob);
+  } else {
+    // Старт
+    btnRec.classList.add('recording');
+    btnRec.textContent = '⏹';
+    recStatus.textContent = 'Запись...';
+
+    // Синхронизируем инструментал
+    const instAudio = document.getElementById('inst-audio');
+    instAudio.currentTime = 0;
+    instAudio.play().catch(() => {});
+
+    recorder.startWithOffset(timingOffsetMs);
+
+    // Таймер
+    const startTs = Date.now();
+    timerInterval = setInterval(() => {
+      const s = Math.floor((Date.now() - startTs) / 1000);
+      recTimer.textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+    }, 500);
+  }
+});
+
+async function uploadRecording(blob) {
+  goStep(3);
+  document.getElementById('preview-uploading').style.display = 'block';
+  document.getElementById('preview-ready').style.display     = 'none';
+
+  const fd = new FormData();
+  fd.append('mic_audio',        blob, 'mic.webm');
+  fd.append('timing_offset_ms', String(timingOffsetMs));
+  fd.append('duration_ms',      String(recorder.elapsedMs || 0));
+
+  try {
+    const r = await fetch(`/api/projects/${PROJECT_ID}/recordings`, {
+      method: 'POST', body: fd,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    currentRecordingId = data.recording_id;
+    pollMixStatus(data.recording_id);
+  } catch (e) {
+    showToast?.('Ошибка загрузки: ' + e.message, false);
+    document.getElementById('preview-uploading').style.display = 'none';
+  }
+}
+
+async function pollMixStatus(recId) {
+  for (let i = 0; i < 60; i++) {   // max 60 попыток × 2с = 2мин
+    await new Promise(r => setTimeout(r, 2000));
+    const r = await fetch(`/api/recordings/${recId}`).then(r => r.json()).catch(() => null);
+    if (!r) continue;
+    if (r.status === 'ready') {
+      showPreview(recId, r);
+      return;
+    }
+    if (r.status === 'failed') {
+      showToast?.('Ошибка микширования: ' + (r.error_msg || ''), false);
+      document.getElementById('preview-uploading').style.display = 'none';
+      return;
+    }
+  }
+  showToast?.('Таймаут ожидания микса', false);
+}
+
+function showPreview(recId, data) {
+  document.getElementById('preview-uploading').style.display = 'none';
+  document.getElementById('preview-ready').style.display     = 'block';
+
+  document.getElementById('prev-mic').src   = data.mic_url   || `/api/recordings/${recId}/mic`;
+  document.getElementById('prev-mixed').src = data.mixed_url || `/api/recordings/${recId}/mixed`;
+  document.getElementById('dl-mixed').href  = data.mixed_url || `/api/recordings/${recId}/mixed`;
+
+  loadRecordingsList();
+}
+
+// ── Новый дубль ────────────────────────────────────────────
+document.getElementById('btn-new-take').addEventListener('click', () => {
+  currentRecordingId = null;
+  document.getElementById('btn-rec').disabled  = false;
+  document.getElementById('btn-rec').textContent = '⏺';
+  document.getElementById('btn-rec').classList.remove('recording');
+  recTimer.textContent  = '0:00';
+  recStatus.textContent = 'Нажми для записи';
+  goStep(2);
+});
+
+// ── История записей ────────────────────────────────────────
+async function loadRecordingsList() {
+  const list = document.getElementById('rec-list');
+  if (!list) return;
+  const recs = await fetch(`/api/projects/${PROJECT_ID}/recordings`)
+    .then(r => r.json()).catch(() => []);
+
+  if (!recs.length) { list.innerHTML = ''; return; }
+
+  list.innerHTML = `<div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;
+    letter-spacing:0.08em;margin-bottom:10px;margin-top:8px">История дублей</div>` +
+    recs.map(r => `
+      <div class="rec-item">
+        <div class="rec-item-info">
+          <div class="rec-item-dur">${fmtDur(r.duration_ms)}</div>
+          <div class="rec-item-date">${new Date(r.created_at).toLocaleString('ru')}
+            · offset ${r.timing_offset_ms}мс</div>
+        </div>
+        <span class="badge badge-${r.status === 'ready' ? 'ready' : r.status === 'failed' ? 'failed' : 'processing'}">${r.status}</span>
+        ${r.has_mix && r.status === 'ready' ? `
+          <a href="/api/recordings/${r.recording_id}/mixed" download>
+            <button class="btn" style="font-size:0.7rem;padding:4px 10px">⬇</button>
+          </a>
+          <button class="btn btn-danger" style="font-size:0.7rem;padding:4px 10px"
+            onclick="deleteRec('${r.recording_id}', this)">🗑</button>` : ''}
+      </div>`).join('');
+}
+
+window.deleteRec = async (id, btn) => {
+  if (!confirm('Удалить эту запись?')) return;
+  btn.disabled = true;
+  await fetch(`/api/recordings/${id}`, { method: 'DELETE' });
+  loadRecordingsList();
+};
+
+function fmtDur(ms) {
+  if (!ms) return '—';
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+loadRecordingsList();
+</script>
+{% endif %}
+{% endblock %}

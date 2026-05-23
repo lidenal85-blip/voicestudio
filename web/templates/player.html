@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.title }} — Плеер{% endblock %}
+
+{% block head %}
+<style>
+  /* ── LAYOUT ─────────────────────────────────────────────── */
+  .player-layout {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 16px;
+  }
+
+  /* ── WAVEFORM ────────────────────────────────────────────── */
+  .waveform-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+  }
+  #waveform-canvas {
+    display: block;
+    width: 100%;
+    height: 72px;
+  }
+  .waveform-progress {
+    position: absolute; top: 0; left: 0;
+    width: 0%; height: 100%;
+    background: rgba(122,253,214,0.06);
+    border-right: 1px solid var(--mint);
+    pointer-events: none;
+    transition: width 0.1s linear;
+  }
+  .waveform-time {
+    position: absolute; bottom: 6px; right: 10px;
+    font-size: 0.7rem; color: var(--muted);
+  }
+
+  /* ── LYRICS DISPLAY ──────────────────────────────────────── */
+  .lyrics-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    min-height: 200px;
+    overflow-y: auto;
+    position: relative;
+  }
+  .lyric-line {
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--muted);
+    transition: all 0.25s ease;
+    cursor: pointer;
+    line-height: 1.6;
+  }
+  .lyric-line:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .lyric-line.active {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.15rem;
+    background: var(--mint-dim);
+    border-left: 3px solid var(--mint);
+    padding-left: 14px;
+    box-shadow: var(--glow);
+  }
+  .lyric-line.past { color: rgba(200,216,232,0.35); }
+  .lyrics-empty {
+    text-align: center; padding: 40px;
+    color: var(--muted); font-size: 0.85rem;
+  }
+
+  /* ── CONTROLS ────────────────────────────────────────────── */
+  .controls-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .ctrl-btn:hover { border-color: var(--mint); color: var(--mint); background: var(--mint-dim); }
+  .ctrl-btn.active { border-color: var(--mint); color: var(--mint); background: var(--mint-dim); }
+  .ctrl-btn-play {
+    width: 52px; height: 52px;
+    font-size: 1.3rem;
+    border-color: var(--mint);
+    color: var(--mint);
+  }
+  .ctrl-btn-play:hover { background: var(--mint); color: var(--bg); }
+
+  .ctrl-slider-wrap {
+    display: flex; flex-direction: column; gap: 2px;
+    flex: 1; min-width: 80px;
+  }
+  .ctrl-slider-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .ctrl-slider {
+    -webkit-appearance: none;
+    width: 100%; height: 4px;
+    background: var(--border);
+    border-radius: 2px; outline: none;
+  }
+  .ctrl-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--mint);
+    cursor: pointer;
+  }
+
+  .ctrl-time {
+    font-size: 0.75rem; color: var(--muted);
+    white-space: nowrap; min-width: 90px; text-align: center;
+  }
+  .ctrl-time strong { color: var(--text); }
+
+  /* ── TRACK SELECTOR ──────────────────────────────────────── */
+  .track-select {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .track-select:focus { border-color: var(--mint); outline: none; }
+
+  /* ── STATUS ──────────────────────────────────────────────── */
+  .buffering-badge {
+    display: none;
+    font-size: 0.72rem; color: var(--amber);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  .buffering-badge.visible { display: inline; }
+
+  @media (max-width: 520px) {
+    .controls-bar { gap: 10px; }
+    .ctrl-slider-wrap { min-width: 60px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+  <a href="/projects/{{ project.id }}" class="back-link">← Детали проекта</a>
+  {% if has_transcription %}
+  <a href="/projects/{{ project.id }}/editor">
+    <button class="btn">✏️ Редактор LRC</button>
+  </a>
+  {% endif %}
+</div>
+
+<div class="page-header">
+  <h1>{{ project.title }}</h1>
+  <p class="text-muted">Karaoke Player <span class="buffering-badge" id="buf-badge">● буферизация...</span></p>
+</div>
+
+<div class="player-layout">
+  <!-- Waveform -->
+  <div class="waveform-wrap" id="waveform-wrap">
+    <canvas id="waveform-canvas"></canvas>
+    <div class="waveform-progress" id="wf-progress"></div>
+    <div class="waveform-time" id="wf-time">0:00 / 0:00</div>
+  </div>
+
+  <!-- Lyrics -->
+  <div class="lyrics-wrap" id="lyrics-wrap">
+    {% if has_transcription %}
+    <div id="lyrics-list">
+      {% for line in lrc_lines %}
+      <div class="lyric-line" data-index="{{ line.index }}" data-start="{{ line.start_ms }}">
+        {{ line.text }}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="lyrics-empty">
+      🎵 Текст появится после транскрипции трека
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Controls -->
+  <div class="controls-bar">
+    <button class="ctrl-btn" id="btn-prev" title="Предыдущая строка">⏮</button>
+    <button class="ctrl-btn ctrl-btn-play" id="btn-play" title="Play / Pause">▶</button>
+    <button class="ctrl-btn" id="btn-next" title="Следующая строка">⏭</button>
+
+    <div class="ctrl-time" id="ctrl-time">
+      <strong>0:00</strong> / 0:00
+    </div>
+
+    <div class="ctrl-slider-wrap">
+      <span class="ctrl-slider-label">Громкость</span>
+      <input type="range" class="ctrl-slider" id="sl-volume" min="0" max="100" value="80" />
+    </div>
+
+    <div class="ctrl-slider-wrap">
+      <span class="ctrl-slider-label">Скорость</span>
+      <input type="range" class="ctrl-slider" id="sl-speed" min="50" max="150" value="100" step="5" />
+    </div>
+
+    <select class="track-select" id="track-select">
+      {% if assets_map.get('vocal') %}
+      <option value="vocal">Вокал</option>
+      {% endif %}
+      {% if assets_map.get('instrumental') %}
+      <option value="instrumental">Инструментал</option>
+      {% endif %}
+      {% if assets_map.get('original') %}
+      <option value="original">Оригинал</option>
+      {% endif %}
+    </select>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+import { KaraokeEngine }  from '/static/js/karaoke-engine.js';
+import { WaveformRenderer } from '/static/js/waveform.js';
+import { LyricSync }       from '/static/js/lyric-sync.js';
+
+const PROJECT_ID  = '{{ project.id }}';
+const LRC_CONTENT = {{ lrc_json | safe }};
+
+// ── Refs ───────────────────────────────────────────────────
+const $play    = document.getElementById('btn-play');
+const $prev    = document.getElementById('btn-prev');
+const $next    = document.getElementById('btn-next');
+const $time    = document.getElementById('ctrl-time');
+const $wfTime  = document.getElementById('wf-time');
+const $wfProg  = document.getElementById('wf-progress');
+const $volSl   = document.getElementById('sl-volume');
+const $spdSl   = document.getElementById('sl-speed');
+const $trackSel= document.getElementById('track-select');
+const $bufBadge= document.getElementById('buf-badge');
+const lyricsEl = document.getElementById('lyrics-list');
+
+// ── Engine ──────────────────────────────────────────────────
+const engine = new KaraokeEngine({
+  lrcContent: LRC_CONTENT,
+  onReady:      () => { $play.disabled = false; },
+  onPlay:       () => { $play.textContent = '⏸'; },
+  onPause:      () => { $play.textContent = '▶'; },
+  onEnded:      () => { $play.textContent = '▶'; },
+  onBuffering:  (b) => $bufBadge.classList.toggle('visible', b),
+  onError:      (e) => showToast?.('Ошибка аудио: ' + e?.message, false),
+  onTimeUpdate: (ms) => updateTime(ms),
+  onLineEnter:  (line) => highlightLine(line.index),
+  onLineExit:   (line) => exitLine(line.index),
+});
+
+// ── Waveform ────────────────────────────────────────────────
+const canvas = document.getElementById('waveform-canvas');
+const wf = new WaveformRenderer(canvas);
+
+// Подключить analyser после первого play
+let wfStarted = false;
+function maybeStartWF() {
+  if (!wfStarted && engine.analyser) {
+    wf.setAnalyser(engine.analyser);
+    wf.start();
+    wfStarted = true;
+  }
+}
+
+// ── Загрузка ────────────────────────────────────────────────
+$play.disabled = true;
+
+function trackUrl(type) {
+  return `/api/projects/${PROJECT_ID}/assets/${type}`;
+}
+
+async function loadTrack(type) {
+  $play.disabled = true;
+  await engine.load(trackUrl(type));
+  $play.disabled = false;
+}
+
+loadTrack($trackSel.value || 'vocal');
+
+$trackSel.addEventListener('change', () => loadTrack($trackSel.value));
+
+// ── Управление ──────────────────────────────────────────────
+$play.addEventListener('click', () => {
+  if (engine.isPlaying) { engine.pause(); }
+  else { engine.play(); maybeStartWF(); }
+});
+
+$prev.addEventListener('click', () => {
+  const cur = engine._sync._currentIdx;
+  if (cur > 0) engine.jumpToLine(cur - 1);
+  else engine.seekTo(0);
+});
+
+$next.addEventListener('click', () => {
+  const cur = engine._sync._currentIdx;
+  engine.jumpToLine(cur + 1);
+});
+
+$volSl.addEventListener('input', () => engine.setVolume(+$volSl.value));
+engine.setVolume(+$volSl.value);
+
+$spdSl.addEventListener('input', () => {
+  engine.setSpeed(+$spdSl.value / 100);
+  $spdSl.title = `${$spdSl.value}%`;
+});
+
+// Клик по волне → перемотка
+document.getElementById('waveform-wrap').addEventListener('click', e => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const ratio = (e.clientX - rect.left) / rect.width;
+  engine.seekTo(ratio * engine.durationMs);
+});
+
+// ── Time / progress ─────────────────────────────────────────
+function fmt(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+function updateTime(ms) {
+  const dur = engine.durationMs;
+  const ratio = dur > 0 ? ms / dur : 0;
+  $wfProg.style.width = (ratio * 100) + '%';
+  const cur = fmt(ms), tot = fmt(dur);
+  $time.innerHTML   = `<strong>${cur}</strong> / ${tot}`;
+  $wfTime.textContent = `${cur} / ${tot}`;
+}
+
+// ── Lyrics highlight ────────────────────────────────────────
+let _activeIdx = -1;
+
+function highlightLine(index) {
+  _activeIdx = index;
+  const all = lyricsEl?.querySelectorAll('.lyric-line');
+  if (!all) return;
+  all.forEach(el => {
+    const i = +el.dataset.index;
+    el.classList.toggle('active', i === index);
+    el.classList.toggle('past',   i < index);
+  });
+  // Авто-скролл к активной строке
+  const active = lyricsEl?.querySelector('.lyric-line.active');
+  active?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function exitLine(index) {
+  const el = lyricsEl?.querySelector(`[data-index="${index}"]`);
+  el?.classList.remove('active');
+  el?.classList.add('past');
+}
+
+// Клик по строке → перемотка
+lyricsEl?.querySelectorAll('.lyric-line').forEach(el => {
+  el.addEventListener('click', () => {
+    engine.seekTo(+el.dataset.start);
+    if (!engine.isPlaying) { engine.play(); maybeStartWF(); }
+  });
+});
+
+// ── Keyboard ────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); $play.click(); }
+  if (e.code === 'ArrowLeft')  engine.seekTo(engine.currentMs - 5000);
+  if (e.code === 'ArrowRight') engine.seekTo(engine.currentMs + 5000);
+  if (e.code === 'ArrowUp')    engine.setVolume(Math.min(100, +$volSl.value + 5));
+  if (e.code === 'ArrowDown')  engine.setVolume(Math.max(0,   +$volSl.value - 5));
+});
+</script>
+{% endblock %}

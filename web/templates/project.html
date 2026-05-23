@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.title }} — Voice Studio{% endblock %}
+
+{% block head %}
+<style>
+  /* ── BACK LINK ──────────────────────────────────────────── */
+  .back-link {
+    font-size: 0.78rem;
+    color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-bottom: 20px;
+    transition: color 0.2s;
+  }
+  .back-link:hover { color: var(--mint); text-decoration: none; }
+
+  /* ── PLAYER CARD ────────────────────────────────────────── */
+  .player-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .track-selector {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .track-tab {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .track-tab:hover { border-color: var(--border-h); color: var(--text); }
+  .track-tab.active {
+    border-color: var(--mint);
+    color: var(--mint);
+    background: var(--mint-dim);
+  }
+  .track-tab:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .player-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+  }
+  .player-title {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+
+  /* Custom audio player wrapper */
+  .audio-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  audio {
+    width: 100%;
+    height: 40px;
+    border-radius: var(--radius);
+    filter: invert(1) hue-rotate(150deg) brightness(0.85);
+  }
+
+  .player-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  /* ── INFO GRID ──────────────────────────────────────────── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .info-cell {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .info-cell-label {
+    font-size: 0.68rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .info-cell-value {
+    font-size: 0.9rem;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  /* ── ASSETS TABLE ───────────────────────────────────────── */
+  .assets-section {
+    margin-top: 8px;
+  }
+  .section-title {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after {
+    content: ''; flex: 1;
+    height: 1px; background: var(--border);
+  }
+
+  .asset-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+  .asset-row:hover { border-color: var(--border-h); }
+
+  .asset-type {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .asset-info {
+    flex: 1;
+    font-size: 0.78rem;
+    color: var(--text);
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .asset-info span { color: var(--muted); }
+
+  /* ── DANGER ZONE ────────────────────────────────────────── */
+  .danger-zone {
+    margin-top: 24px;
+    padding: 16px;
+    border: 1px dashed rgba(255,95,126,0.25);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .danger-zone p {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  /* ── STATUS BANNER (non-ready) ──────────────────────────── */
+  .status-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--amber);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 520px) {
+    .info-grid { grid-template-columns: 1fr 1fr; }
+    .asset-row { flex-wrap: wrap; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link">← Все проекты</a>
+
+<div class="page-header">
+  <h1>{{ project.title }}</h1>
+  <p class="text-muted">
+    ID: <code>{{ project.id }}</code> &nbsp;·&nbsp;
+    Создан: {{ project.created_at.strftime('%d.%m.%Y %H:%M') }}
+  </p>
+</div>
+
+<!-- Quick action buttons -->
+{% if project.status == 'ready' %}
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+  <a href="/projects/{{ project.id }}/player">
+    <button class="btn btn-primary">▶ Karaoke</button>
+  </a>
+  {% if has_transcription %}
+  <a href="/projects/{{ project.id }}/editor">
+    <button class="btn">✏️ LRC Editor</button>
+  </a>
+  {% endif %}
+  <a href="/projects/{{ project.id }}/record">
+    <button class="btn">🎤 Запись</button>
+  </a>
+  <a href="/projects/{{ project.id }}/history">
+    <button class="btn">📦 История / Экспорт</button>
+  </a>
+</div>
+{% endif %}
+
+<!-- Status banner for non-ready projects -->
+{% if project.status != 'ready' %}
+<div class="status-banner">
+  {% if project.status == 'processing' %}
+  <div class="spinner"></div>
+  <div>
+    <div style="font-size:0.85rem;color:#fff">Обработка...</div>
+    <div class="text-muted">Pipeline: {{ project.pipeline_state }}</div>
+  </div>
+  {% elif project.status == 'created' %}
+  <div style="font-size:1.2rem">⏳</div>
+  <div>
+    <div style="font-size:0.85rem;color:#fff">Ожидает воркера</div>
+    <div class="text-muted">Задача поставлена в очередь</div>
+  </div>
+  {% elif project.status == 'failed' %}
+  <div style="font-size:1.2rem">⚠️</div>
+  <div>
+    <div style="font-size:0.85rem;color:var(--red)">Ошибка обработки</div>
+    <div class="text-muted">Попробуйте загрузить трек заново</div>
+  </div>
+  {% endif %}
+  <span class="badge badge-{{ project.status }}" style="margin-left:auto">{{ project.status }}</span>
+</div>
+{% endif %}
+
+<!-- Player (always shown; non-ready tracks have only original) -->
+<div class="player-card">
+  <div class="player-label">Воспроизведение</div>
+
+  <div class="track-selector">
+    {% set types = [
+      ('original',      'Оригинал',     assets_map.get('original')),
+      ('vocal',         'Вокал',        assets_map.get('vocal')),
+      ('instrumental',  'Инструментал', assets_map.get('instrumental')),
+    ] %}
+    {% for key, label, asset in types %}
+    <button
+      class="track-tab {% if loop.first %}active{% endif %}"
+      data-type="{{ key }}"
+      data-project="{{ project.id }}"
+      {% if not asset %}disabled title="Файл ещё не готов"{% endif %}
+    >{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  <div class="audio-wrap">
+    <div class="player-title" id="player-track-name">
+      {{ project.title }} — Оригинал
+    </div>
+    <audio id="main-player" controls preload="none">
+      {% if assets_map.get('original') %}
+      <source src="/api/projects/{{ project.id }}/assets/original" />
+      {% endif %}
+      Браузер не поддерживает аудио.
+    </audio>
+    <div class="player-actions" id="player-actions">
+      {% if assets_map.get('original') %}
+      <a href="/api/projects/{{ project.id }}/assets/original" download>
+        <button class="btn" id="dl-btn">⬇ Скачать</button>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Asset info grid -->
+{% if assets_map %}
+<div class="section-title">Файлы проекта</div>
+<div class="assets-section">
+  {% for key, label, asset in types %}
+  {% if asset %}
+  <div class="asset-row">
+    <div class="asset-type">{{ label }}</div>
+    <div class="asset-info">
+      <span>{{ asset.format.upper() if asset.format else '—' }}</span>
+      {% if asset.duration_ms %}
+      <span>{{ '%d:%02d' | format((asset.duration_ms // 1000) // 60, (asset.duration_ms // 1000) % 60) }}</span>
+      {% endif %}
+      {% if asset.size_bytes %}
+      <span>{{ '%.1f' | format(asset.size_bytes / 1048576) }} MB</span>
+      {% endif %}
+    </div>
+    <div>
+      <a href="/api/projects/{{ project.id }}/assets/{{ key }}" download>
+        <button class="btn">⬇ Скачать</button>
+      </a>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Info cells -->
+<div class="info-grid" style="margin-top:16px">
+  <div class="info-cell">
+    <div class="info-cell-label">Статус</div>
+    <div class="info-cell-value">
+      <span class="badge badge-{{ project.status }}">{{ project.status }}</span>
+    </div>
+  </div>
+  <div class="info-cell">
+    <div class="info-cell-label">Pipeline</div>
+    <div class="info-cell-value" style="font-size:0.78rem">{{ project.pipeline_state }}</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-cell-label">ID проекта</div>
+    <div class="info-cell-value" style="font-size:0.7rem">{{ project.id[:8] }}…</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-cell-label">Дата</div>
+    <div class="info-cell-value" style="font-size:0.78rem">{{ project.created_at.strftime('%d.%m.%Y') }}</div>
+  </div>
+</div>
+
+<!-- Danger zone -->
+<div class="danger-zone">
+  <p>Удалить проект вместе со всеми файлами. Действие необратимо.</p>
+  <button class="btn btn-danger" id="delete-btn" data-id="{{ project.id }}">
+    🗑 Удалить проект
+  </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /* ── TRACK SWITCHER ─────────────────────────────────────── */
+  const player  = document.getElementById('main-player');
+  const nameEl  = document.getElementById('player-track-name');
+  const actEl   = document.getElementById('player-actions');
+  const tabs    = document.querySelectorAll('.track-tab:not([disabled])');
+  const labels  = { original: 'Оригинал', vocal: 'Вокал', instrumental: 'Инструментал' };
+  const projId  = '{{ project.id }}';
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const type = tab.dataset.type;
+      const src  = `/api/projects/${projId}/assets/${type}`;
+      const wasPlaying = !player.paused;
+
+      player.pause();
+      player.innerHTML = `<source src="${src}" />`;
+      player.load();
+      if (wasPlaying) player.play();
+
+      nameEl.textContent = `{{ project.title }} — ${labels[type]}`;
+      actEl.innerHTML = `
+        <a href="${src}" download>
+          <button class="btn">⬇ Скачать ${labels[type]}</button>
+        </a>`;
+    });
+  });
+
+  /* ── DELETE ─────────────────────────────────────────────── */
+  document.getElementById('delete-btn').addEventListener('click', async () => {
+    if (!confirm('Удалить проект «{{ project.title }}»?\nВсе файлы будут удалены.')) return;
+
+    const btn = document.getElementById('delete-btn');
+    btn.disabled = true;
+    btn.textContent = 'Удаляем...';
+
+    try {
+      const r = await fetch(`/api/projects/${projId}`, { method: 'DELETE' });
+      if (r.ok) {
+        showToast('Проект удалён');
+        setTimeout(() => window.location.href = '/', 1000);
+      } else {
+        const d = await r.json().catch(() => ({}));
+        showToast(d.detail || 'Ошибка удаления', false);
+        btn.disabled = false;
+        btn.textContent = '🗑 Удалить проект';
+      }
+    } catch (e) {
+      showToast('Сетевая ошибка', false);
+      btn.disabled = false;
+      btn.textContent = '🗑 Удалить проект';
+    }
+  });
+
+  /* ── AUTO-REFRESH for non-ready ─────────────────────────── */
+  {% if project.status in ('created', 'processing') %}
+  setTimeout(() => location.reload(), 8000);
+  {% endif %}
+</script>
+{% endblock %}

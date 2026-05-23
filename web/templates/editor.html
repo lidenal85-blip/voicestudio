@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}Редактор — {{ project.title }}{% endblock %}
+
+{% block head %}
+<style>
+  /* ── EDITOR LAYOUT ───────────────────────────────────────── */
+  .editor-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .editor-layout { grid-template-columns: 1fr; }
+    .editor-sidebar { order: -1; }
+  }
+
+  /* ── LRC EDITOR STYLES ───────────────────────────────────── */
+  .lrc-editor { display: flex; flex-direction: column; gap: 12px; }
+
+  .lrc-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .lrc-toolbar-right { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+
+  .lrc-search {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    width: 180px;
+  }
+  .lrc-search:focus { border-color: var(--mint); outline: none; }
+
+  .lrc-dirty-badge {
+    font-size: 0.72rem;
+    color: var(--amber);
+    border: 1px solid rgba(255,204,0,0.3);
+    border-radius: 20px;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+
+  .lrc-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .lrc-row {
+    display: grid;
+    grid-template-columns: 32px auto 1fr 32px;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s;
+  }
+  .lrc-row:hover { border-color: var(--border-h); }
+  .lrc-row--dirty { border-color: rgba(255,204,0,0.35); }
+
+  .lrc-idx {
+    font-size: 0.68rem;
+    color: var(--muted);
+    text-align: right;
+    user-select: none;
+  }
+
+  .lrc-timings {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .lrc-time-input {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    width: 68px;
+    padding: 3px 5px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    text-align: center;
+  }
+  .lrc-time-input:focus { border-color: var(--mint); outline: none; }
+  .lrc-time-sep { font-size: 0.65rem; color: var(--muted); }
+
+  .lrc-text-input {
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    width: 100%;
+  }
+  .lrc-text-input:focus { border-color: var(--mint); outline: none; }
+
+  .lrc-play-btn {
+    font-size: 0.85rem;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .lrc-play-btn:hover { border-color: var(--mint); color: var(--mint); background: var(--mint-dim); }
+
+  /* ── SIDEBAR ─────────────────────────────────────────────── */
+  .editor-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: sticky;
+    top: 72px;
+  }
+
+  .sidebar-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .sidebar-card h3 {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #fff;
+    margin-bottom: 10px;
+  }
+
+  /* Mini player in sidebar */
+  .mini-player audio {
+    width: 100%;
+    height: 34px;
+    filter: invert(1) hue-rotate(150deg) brightness(0.85);
+  }
+  .mini-player-info {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  #mini-current-line {
+    font-size: 0.8rem;
+    color: var(--mint);
+    min-height: 1.4em;
+    font-family: var(--sans);
+    margin-top: 6px;
+  }
+
+  .stat-row { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 4px; }
+  .stat-row span:first-child { color: var(--muted); }
+  .stat-row span:last-child  { color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+  <a href="/projects/{{ project.id }}" class="back-link">← Детали проекта</a>
+  <a href="/projects/{{ project.id }}/player">
+    <button class="btn btn-primary">▶ Открыть плеер</button>
+  </a>
+</div>
+
+<div class="page-header">
+  <h1>Редактор LRC</h1>
+  <p class="text-muted">{{ project.title }} · v{{ transcription.version }} · {{ lrc_lines | length }} строк</p>
+</div>
+
+<div class="editor-layout">
+  <!-- Editor -->
+  <div id="lrc-editor-mount"></div>
+
+  <!-- Sidebar -->
+  <div class="editor-sidebar">
+
+    <!-- Mini player -->
+    {% if assets_map.get('vocal') %}
+    <div class="sidebar-card mini-player">
+      <h3>Прослушивание</h3>
+      <audio id="mini-audio" controls src="/api/projects/{{ project.id }}/assets/vocal" preload="none"></audio>
+      <div id="mini-current-line">—</div>
+      <div class="mini-player-info">Кнопка ▷ в строке → перемотка</div>
+    </div>
+    {% endif %}
+
+    <!-- Stats -->
+    <div class="sidebar-card">
+      <h3>Статистика</h3>
+      <div class="stat-row"><span>Строк</span><span>{{ lrc_lines | length }}</span></div>
+      <div class="stat-row"><span>Версия</span><span>v{{ transcription.version }}</span></div>
+      <div class="stat-row"><span>Язык</span><span>{{ transcription.language or '—' }}</span></div>
+      {% if transcription.confidence %}
+      <div class="stat-row">
+        <span>Точность Whisper</span>
+        <span>{{ (transcription.confidence * 100) | round(1) }}%</span>
+      </div>
+      {% endif %}
+      <div class="stat-row" id="dirty-stat"><span>Изменений</span><span>0</span></div>
+    </div>
+
+    <!-- Shortcuts -->
+    <div class="sidebar-card">
+      <h3>Горячие клавиши</h3>
+      <div class="stat-row"><span>Ctrl+Z</span><span>Undo</span></div>
+      <div class="stat-row"><span>Ctrl+Y</span><span>Redo</span></div>
+      <div class="stat-row"><span>Ctrl+S</span><span>Сохранить</span></div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+import { LRCEditor }      from '/static/js/lrc-editor.js';
+import { KaraokeEngine }  from '/static/js/karaoke-engine.js';
+
+const PROJECT_ID = '{{ project.id }}';
+
+const LINES = {{ lines_json | safe }};
+
+// ── Mini audio player ────────────────────────────────────────
+const miniAudio = document.getElementById('mini-audio');
+const miniLine  = document.getElementById('mini-current-line');
+
+// ── LRC Editor ───────────────────────────────────────────────
+const editor = new LRCEditor({
+  lines:     LINES,
+  projectId: PROJECT_ID,
+
+  onSave: (data) => {
+    document.querySelector('#dirty-stat span:last-child').textContent = '0';
+    showToast?.(`Сохранено. Нарезка: job ${(data.slicing_job_id||'').slice(0,8)}...`);
+  },
+
+  onDirty: () => {
+    const cnt = editor.dirtyCount;
+    document.querySelector('#dirty-stat span:last-child').textContent = cnt;
+  },
+
+  onLinePlay: (line) => {
+    if (miniAudio) {
+      miniAudio.currentTime = line.start_ms / 1000;
+      miniAudio.play();
+      miniLine.textContent = line.text;
+    }
+  },
+});
+
+editor.mount(document.getElementById('lrc-editor-mount'));
+
+// Предупреждение при уходе со страницы с несохранёнными изменениями
+window.addEventListener('beforeunload', e => {
+  if (editor.isDirty) {
+    e.preventDefault();
+    e.returnValue = 'Есть несохранённые изменения. Уйти?';
+  }
+});
+</script>
+{% endblock %}

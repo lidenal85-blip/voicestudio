@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+.git
+.gitignore
+storage/
+logs/
+voice_studio.db
+*.zip
+GUIDE.md
+RAILWAY_DEPLOY.md
+ASSISTANT_PROMPT.md
+colab_worker.ipynb
+start.sh
+stop.sh

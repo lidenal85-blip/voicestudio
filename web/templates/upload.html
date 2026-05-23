@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+
+{% block title %}Загрузка трека — Voice Studio{% endblock %}
+
+{% block head %}
+<style>
+  /* ── UPLOAD ZONE ────────────────────────────────────────── */
+  .upload-wrap {
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 52px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    background: var(--surface);
+  }
+  .drop-zone.dragover {
+    border-color: var(--mint);
+    background: var(--mint-dim);
+    box-shadow: var(--glow);
+  }
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .drop-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    display: block;
+    opacity: 0.6;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .drop-zone:hover .drop-icon,
+  .drop-zone.dragover .drop-icon {
+    opacity: 1;
+    transform: scale(1.1) translateY(-4px);
+  }
+
+  .drop-title {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .drop-hint {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .drop-formats {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .fmt-tag {
+    font-size: 0.68rem;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  /* ── SELECTED FILE PREVIEW ──────────────────────────────── */
+  .file-preview {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    margin-top: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-h);
+    border-radius: var(--radius);
+  }
+  .file-preview.visible { display: flex; }
+  .file-icon { font-size: 1.4rem; flex-shrink: 0; }
+  .file-name {
+    flex: 1;
+    font-size: 0.85rem;
+    color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .file-size { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; }
+
+  /* ── PROGRESS ───────────────────────────────────────────── */
+  .progress-section {
+    display: none;
+    margin-top: 16px;
+  }
+  .progress-section.visible { display: block; }
+
+  .progress-bar-wrap {
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--mint), #5bf5c5);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+  .progress-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+  .progress-label #prog-status { color: var(--mint); }
+
+  /* ── SUBMIT AREA ────────────────────────────────────────── */
+  .submit-area {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  /* ── RULES ──────────────────────────────────────────────── */
+  .rules-box {
+    margin-top: 24px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .rules-box strong { color: var(--text); }
+
+  /* ── ERROR ──────────────────────────────────────────────── */
+  .error-box {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: rgba(255,95,126,0.08);
+    border: 1px solid rgba(255,95,126,0.3);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    color: var(--red);
+  }
+  .error-box.visible { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link">← Все проекты</a>
+
+<div class="page-header">
+  <h1>Загрузить трек</h1>
+  <p class="text-muted">Система разделит аудио на вокал и инструментал через Colab-воркер</p>
+</div>
+
+<div class="upload-wrap">
+  <!-- Drop zone -->
+  <div class="drop-zone" id="drop-zone">
+    <input type="file" id="file-input" accept=".mp3,.wav,.flac,.m4a,audio/*" />
+    <span class="drop-icon">🎵</span>
+    <div class="drop-title">Перетащи файл или нажми для выбора</div>
+    <div class="drop-hint">MP3, WAV, FLAC, M4A</div>
+    <div class="drop-formats">
+      <span class="fmt-tag">MP3</span>
+      <span class="fmt-tag">WAV</span>
+      <span class="fmt-tag">FLAC</span>
+      <span class="fmt-tag">M4A</span>
+    </div>
+  </div>
+
+  <!-- Selected file preview -->
+  <div class="file-preview" id="file-preview">
+    <div class="file-icon">🎧</div>
+    <div class="file-name" id="file-name">—</div>
+    <div class="file-size" id="file-size">—</div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="error-box"></div>
+
+  <!-- Progress -->
+  <div class="progress-section" id="progress-section">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="progress-label">
+      <span>Загрузка...</span>
+      <span id="prog-status">0%</span>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <div class="submit-area">
+    <a href="/"><button class="btn" type="button">Отмена</button></a>
+    <button class="btn btn-primary" id="submit-btn" disabled>
+      Загрузить →
+    </button>
+  </div>
+
+  <!-- Rules -->
+  <div class="rules-box">
+    <strong>Ограничения:</strong><br/>
+    Максимальный размер файла: <strong>{{ max_size_mb }} MB</strong><br/>
+    Поддерживаемые форматы: MP3, WAV, FLAC, M4A<br/>
+    После загрузки файл будет сконвертирован в WAV 16-bit / 44.1 kHz
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const ALLOWED_EXTS = ['mp3','wav','flac','m4a'];
+  const MAX_BYTES    = {{ max_size_mb }} * 1024 * 1024;
+
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+  const preview    = document.getElementById('file-preview');
+  const fileNameEl = document.getElementById('file-name');
+  const fileSizeEl = document.getElementById('file-size');
+  const submitBtn  = document.getElementById('submit-btn');
+  const errorBox   = document.getElementById('error-box');
+  const progressSec= document.getElementById('progress-section');
+  const progressBar= document.getElementById('progress-bar');
+  const progStatus = document.getElementById('prog-status');
+
+  let selectedFile = null;
+
+  /* ── DRAG & DROP ──────────────────────────────────────── */
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    errorBox.classList.remove('visible');
+
+    if (!ALLOWED_EXTS.includes(ext)) {
+      showError(`Неподдерживаемый формат: .${ext}. Нужен MP3, WAV, FLAC или M4A.`);
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      showError(`Файл слишком большой: ${formatSize(file.size)}. Максимум {{ max_size_mb }} MB.`);
+      return;
+    }
+
+    selectedFile = file;
+    fileNameEl.textContent = file.name;
+    fileSizeEl.textContent = formatSize(file.size);
+    preview.classList.add('visible');
+    submitBtn.disabled = false;
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.add('visible');
+    selectedFile = null;
+    preview.classList.remove('visible');
+    submitBtn.disabled = true;
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024*1024)).toFixed(1) + ' MB';
+  }
+
+  /* ── UPLOAD ───────────────────────────────────────────── */
+  submitBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    submitBtn.disabled = true;
+    progressSec.classList.add('visible');
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+
+      xhr.upload.addEventListener('progress', e => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          progressBar.style.width = pct + '%';
+          progStatus.textContent  = pct + '%';
+        }
+      });
+
+      xhr.onload = () => {
+        if (xhr.status === 200 || xhr.status === 201) {
+          const data = JSON.parse(xhr.responseText);
+          showToast('Загружено! Переходим к проекту...');
+          progressBar.style.width = '100%';
+          progStatus.textContent  = '100%';
+          setTimeout(() => {
+            window.location.href = `/projects/${data.project_id}`;
+          }, 800);
+        } else {
+          let msg = 'Ошибка загрузки';
+          try { msg = JSON.parse(xhr.responseText).detail || msg; } catch {}
+          showError(msg);
+          progressSec.classList.remove('visible');
+          submitBtn.disabled = false;
+        }
+      };
+
+      xhr.onerror = () => {
+        showError('Сетевая ошибка. Сервер не отвечает.');
+        progressSec.classList.remove('visible');
+        submitBtn.disabled = false;
+      };
+
+      xhr.send(fd);
+    } catch (e) {
+      showError('Неожиданная ошибка: ' + e.message);
+      progressSec.classList.remove('visible');
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+{
+  "name": "Voice Studio MVP",
+  "short_name": "VoiceStudio",
+  "description": "AI-сервис разделения аудио на вокал и инструментал",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07070f",
+  "theme_color": "#7afdd6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Загрузить трек",
+      "short_name": "Загрузить",
+      "url": "/upload",
+      "description": "Загрузить новый аудиофайл"
+    },
+    {
+      "name": "Проекты",
+      "url": "/",
+      "description": "Список всех проектов"
+    }
+  ],
+  "categories": ["music", "productivity"],
+  "lang": "ru"
+}
