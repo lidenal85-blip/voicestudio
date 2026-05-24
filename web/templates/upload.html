@@ -497,10 +497,16 @@
     searchBtn.disabled = true;
     searchBtn.textContent = '⏳ Ищу...';
     searchError.textContent = '';
-    searchResults.innerHTML = '';
+    searchResults.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ Загружаю...</div>';
+    // Используем явный путь без base чтобы избежать двойного префикса
+    const apiBase = window._base || '';
+    const searchUrl = apiBase + '/api/download/search?q=' + encodeURIComponent(q) + '&limit=8';
+    console.log('[VS] Search URL:', searchUrl);
     try {
-      const r = await fetch(base + '/api/download/search?q=' + encodeURIComponent(q) + '&limit=8');
+      const r = await fetch(searchUrl);
+      console.log('[VS] Search status:', r.status);
       const d = await r.json();
+      console.log('[VS] Search results:', d);
       if (!r.ok) throw new Error(d.detail || 'Ошибка поиска');
       if (!d.results?.length) { searchResults.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Ничего не найдено</div>'; return; }
       d.results.forEach(track => {
