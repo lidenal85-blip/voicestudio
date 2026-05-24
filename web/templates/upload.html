@@ -522,19 +522,25 @@
           <button class="btn btn-primary sr-btn" style="font-size:0.7rem;padding:6px 12px">↓ Взять</button>`;
         el.querySelector('.sr-btn').addEventListener('click', async (e) => {
           e.stopPropagation();
-          const btn = e.target;
-          btn.disabled = true; btn.textContent = '⏳';
+          const btn = e.currentTarget || e.target;
+          btn.disabled = true; btn.textContent = '⏳ Скачиваю...';
+          searchError.style.display = 'none';
+          const dlUrl = (window._base || '') + '/api/download';
+          console.log('[VS] Download URL:', dlUrl, 'track:', track.url);
           try {
-            const r2 = await fetch(base + '/api/download', {
+            const r2 = await fetch(dlUrl, {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({url: track.url, title: track.title})
             });
             const d2 = await r2.json();
+            console.log('[VS] Download response:', d2);
             if (!r2.ok) throw new Error(d2.detail || 'Ошибка');
-            window.location.href = base + '/projects/' + d2.project_id;
+            window.location.href = (window._base || '') + '/projects/' + d2.project_id;
           } catch(err) {
+            console.error('[VS] Download error:', err);
             searchError.textContent = err.message;
+            searchError.style.display = 'block';
             btn.disabled = false; btn.textContent = '↓ Взять';
           }
         });
