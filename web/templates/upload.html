@@ -454,7 +454,7 @@
         const d = await r.json();
         urlPreview.style.display = 'flex';
         urlPreview.innerHTML = `
-          ${d.thumbnail ? '<img src="' + d.thumbnail + '" onerror="this.style.display='none'">' : ''}
+          ${d.thumbnail ? `<img src="${d.thumbnail}" onerror="this.remove()">` : ''}
           <div class="url-preview-info">
             <div class="url-preview-title">${d.title || 'Трек'}</div>
             <div class="url-preview-meta">${d.uploader || ''} ${d.duration ? '· ' + Math.floor(d.duration/60) + ':' + String(d.duration%60).padStart(2,'0') : ''}</div>
@@ -508,7 +508,7 @@
         const el = document.createElement('div');
         el.className = 'search-result';
         el.innerHTML = `
-          ${track.thumbnail ? '<img src="' + track.thumbnail + '" onerror="this.style.display='none'">' : ''}
+          ${track.thumbnail ? `<img src="${track.thumbnail}" onerror="this.remove()">` : ''}
           <div class="sr-info">
             <div class="sr-title">${track.title}</div>
             <div class="sr-meta">${track.uploader || ''} ${dur ? '· ' + dur : ''}</div>
