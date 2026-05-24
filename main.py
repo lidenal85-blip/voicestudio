@@ -100,6 +100,7 @@ def create_app() -> FastAPI:
 
     from web.router import router as web_router
     from api.routers import router as api_router
+    from api.download import router as download_router
     from api.transcription import router as transcription_router
     from api.recording import router as recording_router
     from api.export import router as export_router
@@ -114,6 +115,7 @@ def create_app() -> FastAPI:
 
     app.include_router(web_router)
     app.include_router(api_router,           prefix="/api")
+    app.include_router(download_router,       prefix="/api")
     app.include_router(transcription_router, prefix="/api")
     app.include_router(recording_router,     prefix="/api")
     app.include_router(export_router,        prefix="/api")
