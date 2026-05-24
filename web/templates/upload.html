@@ -151,6 +151,56 @@
     color: var(--red);
   }
   .error-box.visible { display: block; }
+
+  /* ── TABS ──────────────────────────────────────────────── */
+  .upload-tabs {
+    display: flex; gap: 6px; margin-bottom: 20px;
+  }
+  .upload-tab {
+    flex: 1; padding: 10px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); font-family: var(--mono); font-size: 0.78rem;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .upload-tab.active {
+    border-color: var(--mint); color: var(--mint); background: var(--mint-dim);
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── URL INPUT ──────────────────────────────────────────── */
+  .url-input {
+    width: 100%; padding: 12px 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    font-family: var(--mono); font-size: 0.82rem;
+    outline: none; transition: border-color 0.2s;
+  }
+  .url-input:focus { border-color: var(--mint); }
+  .url-preview {
+    margin-top: 12px; padding: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); display: flex; gap: 12px; align-items: center;
+  }
+  .url-preview img { width: 60px; height: 45px; object-fit: cover; border-radius: 4px; }
+  .url-preview-info { flex: 1; }
+  .url-preview-title { font-size: 0.85rem; color: #fff; font-weight: 600; }
+  .url-preview-meta { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+
+  /* ── SEARCH RESULTS ─────────────────────────────────────── */
+  .search-results { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .search-result {
+    display: flex; gap: 12px; align-items: center;
+    padding: 10px 12px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .search-result:hover { border-color: var(--mint); background: var(--mint-dim); }
+  .search-result img { width: 56px; height: 42px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
+  .sr-info { flex: 1; min-width: 0; }
+  .sr-title { font-size: 0.82rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sr-meta { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+  .sr-btn { flex-shrink: 0; }
 </style>
 {% endblock %}
 
@@ -159,10 +209,20 @@
 
 <div class="page-header">
   <h1>Загрузить трек</h1>
-  <p class="text-muted">Система разделит аудио на вокал и инструментал через Colab-воркер</p>
+  <p class="text-muted">Загрузи файл, вставь ссылку или найди по названию</p>
 </div>
 
 <div class="upload-wrap">
+
+  <!-- Вкладки -->
+  <div class="upload-tabs">
+    <button class="upload-tab active" data-tab="file">📁 Файл</button>
+    <button class="upload-tab" data-tab="url">🔗 Ссылка</button>
+    <button class="upload-tab" data-tab="search">🔍 Поиск</button>
+  </div>
+
+  <!-- Вкладка: Файл -->
+  <div class="tab-panel active" id="tab-file">
   <!-- Drop zone -->
   <div class="drop-zone" id="drop-zone">
     <input type="file" id="file-input" accept=".mp3,.wav,.flac,.m4a,audio/*" />
@@ -213,6 +273,32 @@
     Поддерживаемые форматы: MP3, WAV, FLAC, M4A<br/>
     После загрузки файл будет сконвертирован в WAV 16-bit / 44.1 kHz
   </div>
+  </div><!-- /tab-file -->
+
+  <!-- Вкладка: Ссылка -->
+  <div class="tab-panel" id="tab-url">
+    <div class="url-input-wrap">
+      <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=..." class="url-input" />
+      <div id="url-preview" class="url-preview" style="display:none"></div>
+    </div>
+    <div class="error-box" id="url-error"></div>
+    <div class="submit-area">
+      <a href="{{ base }}/"><button class="btn" type="button">Отмена</button></a>
+      <button class="btn btn-primary" id="url-submit-btn" disabled>Загрузить →</button>
+    </div>
+    <div class="rules-box">Поддерживаются: YouTube, SoundCloud, VK, Rutube, Яндекс.Музыка</div>
+  </div><!-- /tab-url -->
+
+  <!-- Вкладка: Поиск -->
+  <div class="tab-panel" id="tab-search">
+    <div class="search-wrap">
+      <input type="text" id="search-input" placeholder="Название песни или исполнитель..." class="url-input" />
+      <button class="btn btn-primary" id="search-btn" style="margin-top:10px;width:100%">🔍 Найти</button>
+    </div>
+    <div id="search-results" class="search-results"></div>
+    <div class="error-box" id="search-error"></div>
+  </div><!-- /tab-search -->
+
 </div>
 {% endblock %}
 
@@ -337,5 +423,127 @@
       submitBtn.disabled = false;
     }
   });
+
+  /* ── TABS ─────────────────────────────────────────────── */
+  document.querySelectorAll('.upload-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.upload-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  /* ── URL TAB ──────────────────────────────────────────── */
+  const urlInput    = document.getElementById('url-input');
+  const urlSubmit   = document.getElementById('url-submit-btn');
+  const urlPreview  = document.getElementById('url-preview');
+  const urlError    = document.getElementById('url-error');
+  const base        = window._base || '';
+
+  let urlDebounce;
+  urlInput?.addEventListener('input', () => {
+    clearTimeout(urlDebounce);
+    const val = urlInput.value.trim();
+    urlSubmit.disabled = !val;
+    if (!val) { urlPreview.style.display = 'none'; return; }
+    urlDebounce = setTimeout(async () => {
+      try {
+        const r = await fetch(base + '/api/download/info?url=' + encodeURIComponent(val));
+        if (!r.ok) return;
+        const d = await r.json();
+        urlPreview.style.display = 'flex';
+        urlPreview.innerHTML = `
+          ${d.thumbnail ? '<img src="' + d.thumbnail + '" onerror="this.style.display='none'">' : ''}
+          <div class="url-preview-info">
+            <div class="url-preview-title">${d.title || 'Трек'}</div>
+            <div class="url-preview-meta">${d.uploader || ''} ${d.duration ? '· ' + Math.floor(d.duration/60) + ':' + String(d.duration%60).padStart(2,'0') : ''}</div>
+          </div>`;
+      } catch(e) {}
+    }, 800);
+  });
+
+  urlSubmit?.addEventListener('click', async () => {
+    const url = urlInput.value.trim();
+    if (!url) return;
+    urlSubmit.disabled = true;
+    urlSubmit.textContent = 'Скачиваю...';
+    urlError.textContent = '';
+    try {
+      const r = await fetch(base + '/api/download', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url})
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'Ошибка');
+      window.location.href = base + '/projects/' + d.project_id;
+    } catch(e) {
+      urlError.textContent = e.message;
+      urlSubmit.disabled = false;
+      urlSubmit.textContent = 'Загрузить →';
+    }
+  });
+
+  /* ── SEARCH TAB ───────────────────────────────────────── */
+  const searchInput   = document.getElementById('search-input');
+  const searchBtn     = document.getElementById('search-btn');
+  const searchResults = document.getElementById('search-results');
+  const searchError   = document.getElementById('search-error');
+
+  async function doSearch() {
+    const q = searchInput.value.trim();
+    if (!q) return;
+    searchBtn.disabled = true;
+    searchBtn.textContent = '⏳ Ищу...';
+    searchError.textContent = '';
+    searchResults.innerHTML = '';
+    try {
+      const r = await fetch(base + '/api/download/search?q=' + encodeURIComponent(q) + '&limit=8');
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'Ошибка поиска');
+      if (!d.results?.length) { searchResults.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Ничего не найдено</div>'; return; }
+      d.results.forEach(track => {
+        const dur = track.duration ? Math.floor(track.duration/60) + ':' + String(track.duration%60).padStart(2,'0') : '';
+        const el = document.createElement('div');
+        el.className = 'search-result';
+        el.innerHTML = `
+          ${track.thumbnail ? '<img src="' + track.thumbnail + '" onerror="this.style.display='none'">' : ''}
+          <div class="sr-info">
+            <div class="sr-title">${track.title}</div>
+            <div class="sr-meta">${track.uploader || ''} ${dur ? '· ' + dur : ''}</div>
+          </div>
+          <button class="btn btn-primary sr-btn" style="font-size:0.7rem;padding:6px 12px">↓ Взять</button>`;
+        el.querySelector('.sr-btn').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const btn = e.target;
+          btn.disabled = true; btn.textContent = '⏳';
+          try {
+            const r2 = await fetch(base + '/api/download', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({url: track.url, title: track.title})
+            });
+            const d2 = await r2.json();
+            if (!r2.ok) throw new Error(d2.detail || 'Ошибка');
+            window.location.href = base + '/projects/' + d2.project_id;
+          } catch(err) {
+            searchError.textContent = err.message;
+            btn.disabled = false; btn.textContent = '↓ Взять';
+          }
+        });
+        searchResults.appendChild(el);
+      });
+    } catch(e) {
+      searchError.textContent = e.message;
+    } finally {
+      searchBtn.disabled = false;
+      searchBtn.textContent = '🔍 Найти';
+    }
+  }
+
+  searchBtn?.addEventListener('click', doSearch);
+  searchInput?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
 </script>
 {% endblock %}
